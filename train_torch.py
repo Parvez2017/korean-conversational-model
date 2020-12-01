@@ -116,8 +116,7 @@ class CharDataset(Dataset):
             logging.info('labels {}'.format(labels))
             self.first = False
         mask = [0] * q_len + [1] * a_len + [0] * (self.max_len - q_len - a_len)
-        return (self.padder(self.vocab[q_toked + a_toked]), np.array(mask),
-                self.padder(self.vocab[labels]))
+        return (self.padder(self.vocab[q_toked + a_toked]), np.array(mask))
 
 
 class KoGPT2Chat(LightningModule):
@@ -158,11 +157,11 @@ class KoGPT2Chat(LightningModule):
         return output
 
     def training_step(self, batch, batch_idx):
-        token_ids, mask, label = batch
+        token_ids, mask = batch
         out = self(token_ids)
         mask_3d = mask.unsqueeze(dim=2).repeat_interleave(repeats=out.shape[2], dim=2)
         mask_out = torch.where(mask_3d == 1, out, self.neg * torch.ones_like(out))
-        loss = self.loss_function(mask_out.transpose(2, 1), label)
+        loss = self.loss_function(mask_out.transpose(2, 1))
         loss_avg = loss.sum() / mask.sum()
         tensorboard_logs = {'train_loss': loss_avg}
         return {'loss': loss_avg, 'log': tensorboard_logs}
@@ -191,8 +190,7 @@ class KoGPT2Chat(LightningModule):
     def _collate_fn(self, batch):
         data = [item[0] for item in batch]
         mask = [item[1] for item in batch]
-        label = [item[2] for item in batch]
-        return torch.LongTensor(data), torch.LongTensor(mask), torch.LongTensor(label)
+        return torch.LongTensor(data), torch.LongTensor(mask)
 
     def train_dataloader(self):
         data = pd.read_csv('Chatbot_data/merged_final.csv')
